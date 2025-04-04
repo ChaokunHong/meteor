@@ -1,0 +1,17 @@
+pathogen,antibiotic,n_tested,n_resistant,resistance_rate,year,region,domain
+E. coli,Ampicillin,120,78,0.65,2020,North America,human
+E. coli,Ampicillin,95,59,0.62,2021,North America,human
+E. coli,Ampicillin,200,110,0.55,2020,Europe,human
+E. coli,Ampicillin,215,129,0.60,2021,Europe,human
+E. coli,Ciprofloxacin,120,18,0.15,2020,North America,human
+E. coli,Ciprofloxacin,95,17,0.18,2021,North America,human
+E. coli,Ciprofloxacin,200,24,0.12,2020,Europe,human
+E. coli,Ciprofloxacin,215,32,0.15,2021,Europe,human
+S. aureus,Methicillin,80,32,0.40,2020,North America,human
+S. aureus,Methicillin,75,27,0.36,2021,North America,human
+S. aureus,Methicillin,150,54,0.36,2020,Europe,human
+S. aureus,Methicillin,130,42,0.32,2021,Europe,human
+K. pneumoniae,Carbapenem,65,9,0.14,2020,North America,human
+K. pneumoniae,Carbapenem,55,8,0.15,2021,North America,human
+K. pneumoniae,Carbapenem,110,12,0.11,2020,Europe,human
+K. pneumoniae,Carbapenem,125,16,0.13,2021,Europe,human 
