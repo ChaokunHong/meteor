@@ -2,8 +2,7 @@ Package: meteor
 Title: Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms
 Version: 0.1.0
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
+    person("Chaokun", "Hong", , "chaokun.hong@gmail.com", role = c("aut", "cre"))
 Description: An R package for meta-analysis of antimicrobial resistance outcomes 
     across different realms (human, animal, and environment). It provides tools
     for data import, validation, analysis, visualization, and reporting of 
