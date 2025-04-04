@@ -1,8 +1,8 @@
 # meteor: Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms
 
 <!-- badges: start -->
-[![R-CMD-check](https://github.com/username/meteor/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/username/meteor/actions/workflows/R-CMD-check.yaml)
-[![Codecov test coverage](https://codecov.io/gh/username/meteor/branch/main/graph/badge.svg)](https://app.codecov.io/gh/username/meteor?branch=main)
+[![R-CMD-check](https://github.com/ChaokunHong/meteor/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/ChaokunHong/meteor/actions/workflows/R-CMD-check.yaml)
+[![Codecov test coverage](https://codecov.io/gh/ChaokunHong/meteor/branch/main/graph/badge.svg)](https://app.codecov.io/gh/ChaokunHong/meteor?branch=main)
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 [![CRAN status](https://www.r-pkg.org/badges/version/meteor)](https://CRAN.R-project.org/package=meteor)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
@@ -27,7 +27,7 @@ You can install the development version of meteor from GitHub:
 
 ```r
 # Install from GitHub
-devtools::install_github("username/meteor")
+devtools::install_github("ChaokunHong/meteor")
 ```
 
 ## Usage
@@ -108,9 +108,9 @@ If you use this package in your research, please cite:
 
 ```
 @software{meteor2023,
-  author = {Authors},
+  author = {Hong, Chaokun},
   title = {meteor: Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms},
-  url = {https://github.com/username/meteor},
+  url = {https://github.com/ChaokunHong/meteor},
   version = {0.1.0},
   year = {2023},
 }
@@ -118,7 +118,11 @@ If you use this package in your research, please cite:
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a pull request or open an issue on our [GitHub repository](https://github.com/username/meteor).
+Contributions are welcome! Please feel free to submit a pull request or open an issue on our [GitHub repository](https://github.com/ChaokunHong/meteor).
+
+## Contact
+
+For questions or feedback, please contact Chaokun Hong at chaokun.hong@gmail.com.
 
 ## Code of Conduct
 
