@@ -1,0 +1,204 @@
+---
+title: "Introduction to meteor"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to meteor}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Introduction
+
+METEOR (Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms) is an R package designed to help researchers analyze antimicrobial resistance (AMR) data across human, animal, and environmental domains. This vignette provides a quick introduction to the main functionality of the package.
+
+## Installation
+
+You can install the development version of meteor from GitHub:
+
+```{r, eval=FALSE}
+# Install devtools if not already installed
+# install.packages("devtools")
+devtools::install_github("username/meteor")
+```
+
+## Loading the Package
+
+```{r}
+library(meteor)
+```
+
+# Basic Workflow
+
+The typical workflow with meteor includes:
+
+1. Loading and validating data
+2. Performing meta-analysis
+3. Visualizing the results
+4. Generating reports
+
+## Loading Data
+
+METEOR comes with built-in human AMR data:
+
+```{r}
+# Load the built-in human AMR data
+data(human_amr)
+
+# Examine the structure of the data
+str(human_amr, max.level = 1)
+```
+
+You can also import your own data:
+
+```{r, eval=FALSE}
+# Import AMR data from a CSV file
+my_data <- import_amr_data("path/to/your/data.csv")
+
+# Or from Excel
+excel_data <- import_amr_data("path/to/your/data.xlsx")
+```
+
+## Data Validation and Standardization
+
+Before analysis, it's important to validate and standardize your data:
+
+```{r}
+# Validate data
+validation <- validate_data(human_amr)
+
+if (validation$valid) {
+  cat("Data validation successful!\n")
+} else {
+  cat("Data validation issues found:\n")
+  print(validation$issues)
+}
+
+# Standardize data
+std_data <- standardize_amr_data(human_amr)
+```
+
+## Filtering Data
+
+You can filter data to focus on specific subsets:
+
+```{r}
+# Filter data to specific pathogens and antibiotics
+filtered_data <- filter_amr_data(
+  human_amr,
+  pathogen = c("Ecoil", "KP"),
+  antibiotic = c("CIP", "TET"),
+  year_range = c(2010, 2020)
+)
+
+# Check how many records we have after filtering
+nrow(filtered_data)
+```
+
+## Meta-Analysis
+
+The core functionality of METEOR is to perform meta-analysis on AMR data:
+
+```{r}
+# Perform meta-analysis grouped by pathogen and antibiotic
+results <- calculate_pooled_rate(
+  data = filtered_data,
+  by = c("pathogen", "antibiotic"),
+  method = "random"
+)
+
+# Look at the summary of results
+summary_table <- results$summary
+head(summary_table)
+```
+
+## Heterogeneity Analysis
+
+You can analyze heterogeneity in your meta-analysis:
+
+```{r}
+# Analyze heterogeneity
+heterogeneity <- analyze_heterogeneity(filtered_data, by = c("pathogen", "antibiotic"))
+
+# Look at the heterogeneity summary
+heterogeneity$summary
+```
+
+## Visualization
+
+METEOR provides various visualization functions:
+
+```{r, fig.width=8, fig.height=6}
+# Create a forest plot
+forest_plot <- create_forest_plot(results)
+print(forest_plot)
+```
+
+```{r, fig.width=8, fig.height=6}
+# Create a heatmap of resistance rates
+heatmap <- create_resistance_heatmap(
+  data = filtered_data,
+  x_var = "pathogen",
+  y_var = "antibiotic"
+)
+print(heatmap)
+```
+
+## Interactive Shiny App
+
+METEOR includes an interactive Shiny app for exploring AMR data:
+
+```{r, eval=FALSE}
+# Launch the Shiny app
+launch_meteor(data = human_amr)
+```
+
+# Working with Local Data
+
+You can compare your local data with existing meta-analysis results:
+
+```{r}
+# Create sample local data
+local_data <- data.frame(
+  pathogen = c("Ecoil", "KP"),
+  antibiotic = c("CIP", "TET"),
+  resistance_rate = c(0.65, 0.45),
+  sample_size_ab = c(100, 80)
+)
+
+# Compare with meta-analysis results
+comparison <- compare_with_meta(
+  local_data = local_data,
+  meta_results = results,
+  by = c("pathogen", "antibiotic")
+)
+
+# Check comparison results
+comparison$summary
+```
+
+# Project Management
+
+METEOR helps you organize your AMR meta-analysis projects:
+
+```{r, eval=FALSE}
+# Initialize a new project
+initialize_meteor_project("path/to/projects", "my_amr_analysis")
+```
+
+# Conclusion
+
+METEOR provides a comprehensive toolkit for meta-analysis of antimicrobial resistance data. This vignette covers the basic functionality, but there are many more features available. Check the documentation for more details.
+
+```{r}
+# Get help on specific topics
+meteor_help("analysis")
+``` 
