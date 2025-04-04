@@ -1,129 +1,65 @@
-# meteor: Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms
+# METEOR 
+
+## Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms
 
 <!-- badges: start -->
-[![R-CMD-check](https://github.com/ChaokunHong/meteor/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/ChaokunHong/meteor/actions/workflows/R-CMD-check.yaml)
-[![Codecov test coverage](https://codecov.io/gh/ChaokunHong/meteor/branch/main/graph/badge.svg)](https://app.codecov.io/gh/ChaokunHong/meteor?branch=main)
-[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
-[![CRAN status](https://www.r-pkg.org/badges/version/meteor)](https://CRAN.R-project.org/package=meteor)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 <!-- badges: end -->
 
-## Overview
-
-The `meteor` package is an R toolkit for meta-analysis of antimicrobial resistance (AMR) data across human, animal, and environmental domains. It provides a comprehensive set of functions for data import, validation, analysis, visualization, and reporting of AMR patterns.
+METEOR is an R package designed for meta-analysis of antimicrobial resistance (AMR) data across different domains: human, animal, and environment. The package provides tools for data import, validation, analysis, visualization, and reporting.
 
 ## Features
 
-- **Data Management**: Import, validate, and standardize AMR data from various sources
-- **Meta-Analysis**: Conduct pooled analyses, heterogeneity assessments, subgroup analyses, and more
-- **Visualization**: Create forest plots, geographic maps, heatmaps, and interactive visualizations
-- **Shiny Applications**: Interactive dashboards for data exploration and analysis
-- **Prediction**: Forecast AMR trends and simulate intervention impacts
-- **Reporting**: Generate customized reports for different audiences
+- Import AMR data from various file formats (CSV, Excel, RData)
+- Validate and standardize data for meta-analysis
+- Perform meta-analysis with various methods and options
+- Create static and interactive visualizations
+- Analyze heterogeneity and publication bias
+- Compare data across different domains (One Health approach)
+- Interactive exploration via a Shiny application
 
 ## Installation
 
-You can install the development version of meteor from GitHub:
+You can install the development version of meteor from GitHub with:
 
 ```r
-# Install from GitHub
-devtools::install_github("ChaokunHong/meteor", subdir = "meteor")
+# install.packages("devtools")
+devtools::install_github("ChaokunHong/meteor")
 ```
 
-## Usage
+## Example
+
+Basic usage example:
 
 ```r
 library(meteor)
 
-# Launch the Shiny application
-launch_meteor()
+# Import data
+amr_data <- import_amr_data("path/to/data.csv")
 
-# Or use specific functions
-data <- import_amr_data("your_data.csv")
-validated_data <- validate_data(data)
-results <- calculate_pooled_rate(validated_data)
-plot <- create_forest_plot(results)
-```
+# Validate and standardize data
+validated_data <- validate_data(amr_data, domain = "human")
+std_data <- standardize_amr_data(validated_data, domain = "human")
 
-## Data
-
-The package includes curated AMR data from:
-
-- Human clinical studies
-- Animal studies (forthcoming)
-- Environmental studies (forthcoming)
-
-Users can also upload their own data for comparison with existing meta-analyses.
-
-## Documentation
-
-See the vignettes and help pages for detailed documentation:
-
-```r
-browseVignettes("meteor")
-help(package = "meteor")
-```
-
-## Examples
-
-### Meta-analysis of resistance rates
-
-```r
-# Load built-in human AMR data
-data(human_amr)
-
-# Filter to specific pathogens and antibiotics
-filtered_data <- filter_amr_data(
-  human_amr,
-  pathogen = c("Ecoil", "KP"),
-  antibiotic = c("CIP", "TET")
-)
-
-# Run meta-analysis
-results <- calculate_pooled_rate(
-  data = filtered_data,
+# Perform meta-analysis
+meta_results <- calculate_pooled_rate(
+  std_data,
   by = c("pathogen", "antibiotic"),
   method = "random"
 )
 
-# Visualize results
-create_forest_plot(results)
-```
-
-### Interactive exploration
-
-```r
-# Launch Shiny dashboard with custom data
-data(human_amr)
-launch_meteor(data = human_amr)
+# Create forest plot
+create_forest_plot(meta_results)
 ```
 
 ## License
 
-MIT
-
-## Citation
-
-If you use this package in your research, please cite:
-
-```
-@software{meteor2023,
-  author = {Hong, Chaokun},
-  title = {meteor: Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms},
-  url = {https://github.com/ChaokunHong/meteor},
-  version = {0.1.0},
-  year = {2023},
-}
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a pull request or open an issue on our [GitHub repository](https://github.com/ChaokunHong/meteor).
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Contact
 
-For questions or feedback, please contact Chaokun Hong at chaokun.hong@gmail.com.
+For questions or feedback, please contact: chaokun.hong@gmail.com
 
-## Code of Conduct
+## Acknowledgments
 
-Please note that the meteor project is released with a [Contributor Code of Conduct](https://contributor-covenant.org/version/2/0/CODE_OF_CONDUCT.html). By contributing to this project, you agree to abide by its terms. 
+- World Health Organization (WHO) for guidance on AMR monitoring
+- R meta-analysis community and package developers 

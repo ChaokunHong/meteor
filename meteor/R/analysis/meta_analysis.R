@@ -1,785 +1,665 @@
 #' Calculate pooled resistance rate
 #'
-#' Perform meta-analysis to calculate pooled antimicrobial resistance rates
+#' Performs meta-analysis to calculate pooled antimicrobial resistance rates
 #'
-#' @param data A data frame containing AMR data
-#' @param by Variables to group by for separate meta-analyses
-#' @param method Meta-analysis method: "fixed" or "random"
-#' @param measure Effect measure to use (default: "PR" for proportion)
-#' @param weight_by Variable to use for weighting (default: "sample_size_ab")
+#' @param data Data frame containing standardized AMR data
+#' @param by Character vector of variables to group by
+#' @param method Meta-analysis method (e.g., "fixed" or "random")
+#' @param measure Effect measure (default: "PR" for proportion)
+#' @param ... Additional arguments passed to meta::metaprop
+#'
 #' @return A list containing meta-analysis results
 #' @export
+#'
 #' @examples
 #' \dontrun{
-#' data(human_amr)
-#' results <- calculate_pooled_rate(human_amr, by = c("pathogen", "antibiotic"))
+#' # Calculate pooled resistance rates by pathogen and antibiotic
+#' meta_results <- calculate_pooled_rate(
+#'   standardized_data,
+#'   by = c("pathogen", "antibiotic"),
+#'   method = "random"
+#' )
 #' }
-calculate_pooled_rate <- function(data, 
-                                by = NULL,
-                                method = "random",
-                                measure = "PR",
-                                weight_by = "sample_size_ab") {
-  # Check dependencies
-  if (!requireNamespace("metafor", quietly = TRUE)) {
-    stop("Package 'metafor' is required for this function")
+calculate_pooled_rate <- function(data, by = NULL, 
+                                method = c("random", "fixed"), 
+                                measure = "PR", ...) {
+  method <- match.arg(method)
+  
+  # Check for meta package
+  if (!requireNamespace("meta", quietly = TRUE)) {
+    stop("Package 'meta' is required for this function. Please install it.")
   }
   
-  # Validate input
-  if (!is.data.frame(data)) {
-    stop("Input must be a data frame")
+  # Check if data is standardized
+  if (is.null(attr(data, "standardized"))) {
+    warning("Input data does not appear to be standardized. Results may be unreliable.")
   }
   
   # Check required columns
-  required_cols <- c("resistance_rate", weight_by)
-  missing_cols <- setdiff(required_cols, colnames(data))
+  required_cols <- c("n_resistant", "n_tested")
+  missing_cols <- required_cols[!required_cols %in% names(data)]
   if (length(missing_cols) > 0) {
     stop("Missing required columns: ", paste(missing_cols, collapse = ", "))
   }
   
-  # Check if resistance_rate is numeric and between 0 and 1
-  if (!is.numeric(data$resistance_rate) || 
-      any(data$resistance_rate < 0 | data$resistance_rate > 1, na.rm = TRUE)) {
-    warning("resistance_rate should be numeric between 0 and 1; correcting...")
-    data$resistance_rate <- pmin(pmax(as.numeric(data$resistance_rate), 0), 1)
-  }
-  
-  # Initialize results list
-  results <- list(
-    overall = NULL,
-    by_group = list(),
-    data = data,
-    method = method,
-    measure = measure
-  )
-  
   # If no grouping variables, perform overall meta-analysis
-  if (is.null(by) || length(by) == 0) {
-    # Transform proportions using Freeman-Tukey double arcsine transformation
-    data$prop_transformed <- metafor::escalc(
-      measure = "PFT",
-      xi = round(data$resistance_rate * data[[weight_by]]),
-      ni = data[[weight_by]]
-    )$yi
-    
-    # Compute standard errors
-    data$se <- 1 / sqrt(data[[weight_by]])
-    
-    # Perform meta-analysis
-    meta_result <- metafor::rma(
-      yi = prop_transformed,
-      sei = se,
-      method = method,
-      data = data
-    )
-    
-    # Back-transform results to proportions
-    results$overall <- list(
-      model = meta_result,
-      pooled_rate = metafor::transf.ipft(meta_result$b),
-      ci_lower = metafor::transf.ipft(meta_result$ci.lb),
-      ci_upper = metafor::transf.ipft(meta_result$ci.ub),
-      heterogeneity = c(I2 = meta_result$I2, H2 = meta_result$H2, tau2 = meta_result$tau2),
-      k = meta_result$k
-    )
-    
-    return(results)
-  }
-  
-  # If grouping variables, perform meta-analysis for each group
-  if (!all(by %in% colnames(data))) {
-    stop("Not all grouping variables are in the data: ", 
-         paste(setdiff(by, colnames(data)), collapse = ", "))
-  }
-  
-  # Split data by groups
-  groups <- unique(data[, by, drop = FALSE])
-  
-  # For each group, perform meta-analysis
-  for (i in 1:nrow(groups)) {
-    # Extract group values
-    group_vals <- as.list(groups[i, ])
-    
-    # Create group identifier
-    group_id <- paste(
-      sapply(1:length(by), function(j) paste0(by[j], "=", group_vals[[by[j]]])),
-      collapse = ", "
-    )
-    
-    # Filter data for this group
-    filter_expr <- paste(
-      sapply(1:length(by), function(j) paste0("data$", by[j], " == '", group_vals[[by[j]]], "'")),
-      collapse = " & "
-    )
-    group_data <- subset(data, eval(parse(text = filter_expr)))
-    
-    # Skip if not enough data
-    if (nrow(group_data) < 2) {
-      results$by_group[[group_id]] <- list(
-        values = group_vals,
-        pooled_rate = NA,
-        ci_lower = NA,
-        ci_upper = NA,
-        heterogeneity = NA,
-        k = nrow(group_data)
-      )
-      next
-    }
-    
-    # Transform proportions
-    group_data$prop_transformed <- metafor::escalc(
-      measure = "PFT",
-      xi = round(group_data$resistance_rate * group_data[[weight_by]]),
-      ni = group_data[[weight_by]]
-    )$yi
-    
-    # Compute standard errors
-    group_data$se <- 1 / sqrt(group_data[[weight_by]])
-    
-    # Perform meta-analysis
-    tryCatch({
-      meta_result <- metafor::rma(
-        yi = prop_transformed,
-        sei = se,
+  if (is.null(by)) {
+    # Perform meta-analysis on all data
+    meta_result <- try(
+      meta::metaprop(
+        event = data$n_resistant,
+        n = data$n_tested,
+        studlab = data$study_id,
         method = method,
-        data = group_data
-      )
-      
-      # Store results
-      results$by_group[[group_id]] <- list(
-        values = group_vals,
-        model = meta_result,
-        pooled_rate = metafor::transf.ipft(meta_result$b),
-        ci_lower = metafor::transf.ipft(meta_result$ci.lb),
-        ci_upper = metafor::transf.ipft(meta_result$ci.ub),
-        heterogeneity = c(I2 = meta_result$I2, H2 = meta_result$H2, tau2 = meta_result$tau2),
-        k = meta_result$k,
-        data = group_data
-      )
-    }, error = function(e) {
-      warning("Error in meta-analysis for group: ", group_id, " - ", e$message)
-      results$by_group[[group_id]] <- list(
-        values = group_vals,
-        pooled_rate = NA,
-        ci_lower = NA,
-        ci_upper = NA,
-        heterogeneity = NA,
-        k = nrow(group_data),
-        error = e$message
-      )
-    })
-  }
-  
-  # Create a summary data frame of results
-  summary_data <- data.frame(
-    group = names(results$by_group),
-    k = sapply(results$by_group, function(x) x$k),
-    pooled_rate = sapply(results$by_group, function(x) x$pooled_rate),
-    ci_lower = sapply(results$by_group, function(x) x$ci_lower),
-    ci_upper = sapply(results$by_group, function(x) x$ci_upper),
-    I2 = sapply(results$by_group, function(x) {
-      if (is.list(x$heterogeneity)) x$heterogeneity["I2"] else NA
-    }),
-    stringsAsFactors = FALSE
-  )
-  
-  # Add group variables as separate columns
-  for (var in by) {
-    summary_data[[var]] <- sapply(results$by_group, function(x) x$values[[var]])
-  }
-  
-  # Sort by pooled rate
-  summary_data <- summary_data[order(summary_data$pooled_rate, decreasing = TRUE), ]
-  
-  # Add to results
-  results$summary <- summary_data
-  
-  return(results)
-}
-
-#' Analyze heterogeneity
-#'
-#' Analyze heterogeneity in antimicrobial resistance data
-#'
-#' @param data A data frame containing AMR data
-#' @param by Variables to group by for separate heterogeneity analyses
-#' @param method Meta-analysis method: "fixed" or "random"
-#' @return A list containing heterogeneity analysis results
-#' @export
-#' @examples
-#' \dontrun{
-#' data(human_amr)
-#' heterogeneity <- analyze_heterogeneity(human_amr, by = c("pathogen", "antibiotic"))
-#' }
-analyze_heterogeneity <- function(data, by = NULL, method = "random") {
-  # Check dependencies
-  if (!requireNamespace("metafor", quietly = TRUE)) {
-    stop("Package 'metafor' is required for this function")
-  }
-  
-  # Run meta-analysis first to get heterogeneity statistics
-  meta_results <- calculate_pooled_rate(data, by = by, method = method)
-  
-  # Extract heterogeneity statistics
-  if (is.null(by) || length(by) == 0) {
-    # Overall heterogeneity only
-    results <- list(
-      overall = meta_results$overall$heterogeneity,
-      method = method
+        sm = measure,
+        ...
+      ),
+      silent = TRUE
     )
+    
+    if (inherits(meta_result, "try-error")) {
+      warning("Meta-analysis failed: ", as.character(meta_result))
+      return(NULL)
+    }
+    
+    # Return result
+    return(list(
+      overall = meta_result,
+      by = NULL,
+      data = data
+    ))
   } else {
-    # Heterogeneity by group
-    results <- list(
-      by_group = lapply(meta_results$by_group, function(x) x$heterogeneity),
-      summary = meta_results$summary[, c("group", by, "k", "I2")],
-      method = method
-    )
-    
-    # Add overall heterogeneity test if possible
-    if (all(c("pathogen", "antibiotic") %in% by)) {
-      # Try to perform a meta-regression with moderators
-      tryCatch({
-        # Prepare data for meta-regression
-        data$prop_transformed <- metafor::escalc(
-          measure = "PFT",
-          xi = round(data$resistance_rate * data$sample_size_ab),
-          ni = data$sample_size_ab
-        )$yi
-        
-        data$se <- 1 / sqrt(data$sample_size_ab)
-        
-        # Perform meta-regression with moderators
-        metareg <- metafor::rma(
-          yi = prop_transformed,
-          sei = se,
-          mods = ~ as.factor(pathogen) * as.factor(antibiotic),
-          method = method,
-          data = data
-        )
-        
-        # Add to results
-        results$meta_regression <- list(
-          model = metareg,
-          QE = metareg$QE,
-          QEp = metareg$QEp,
-          QM = metareg$QM,
-          QMp = metareg$QMp
-        )
-      }, error = function(e) {
-        warning("Could not perform meta-regression: ", e$message)
-      })
-    }
-  }
-  
-  return(results)
-}
-
-#' Perform subgroup analysis
-#'
-#' Perform subgroup analysis of antimicrobial resistance rates
-#'
-#' @param data A data frame containing AMR data
-#' @param by Variables to group by for subgroup analyses
-#' @param method Meta-analysis method: "fixed" or "random"
-#' @return A list containing subgroup analysis results
-#' @export
-#' @examples
-#' \dontrun{
-#' data(human_amr)
-#' subgroups <- perform_subgroup_analysis(human_amr, by = c("population", "location"))
-#' }
-perform_subgroup_analysis <- function(data, by, method = "random") {
-  # Check dependencies
-  if (!requireNamespace("metafor", quietly = TRUE)) {
-    stop("Package 'metafor' is required for this function")
-  }
-  
-  # Validate input
-  if (!is.data.frame(data)) {
-    stop("Input must be a data frame")
-  }
-  
-  if (!all(by %in% colnames(data))) {
-    stop("Not all grouping variables are in the data: ", 
-         paste(setdiff(by, colnames(data)), collapse = ", "))
-  }
-  
-  # Initialize results list
-  results <- list(
-    subgroups = list(),
-    method = method
-  )
-  
-  # Analyze each subgroup variable separately
-  for (var in by) {
-    # Get unique values for this variable
-    values <- unique(data[[var]])
-    
-    # Skip if NA or too few values
-    if (length(values) < 2 || all(is.na(values))) {
-      next
+    # Check if grouping variables exist
+    missing_by <- by[!by %in% names(data)]
+    if (length(missing_by) > 0) {
+      stop("Grouping variables not found in data: ", paste(missing_by, collapse = ", "))
     }
     
-    # Store results for this variable
-    var_results <- list()
+    # Create grouping factor
+    if (length(by) == 1) {
+      groups <- data[[by]]
+    } else {
+      # Combine multiple grouping variables
+      groups <- do.call(paste, c(data[by], sep = " | "))
+    }
     
-    # For each value, perform meta-analysis
-    for (val in values) {
-      if (is.na(val)) next
+    # Split data by groups
+    grouped_data <- split(data, groups)
+    
+    # Perform meta-analysis for each group
+    meta_results <- list()
+    
+    for (group_name in names(grouped_data)) {
+      group_data <- grouped_data[[group_name]]
       
-      # Subset data
-      subset_data <- data[data[[var]] == val, ]
-      
-      # Skip if not enough data
-      if (nrow(subset_data) < 2) {
-        var_results[[as.character(val)]] <- list(
-          value = val,
-          pooled_rate = NA,
-          ci_lower = NA,
-          ci_upper = NA,
-          heterogeneity = NA,
-          k = nrow(subset_data)
-        )
+      # Skip groups with fewer than 2 studies
+      if (nrow(group_data) < 2) {
+        warning("Group '", group_name, "' has fewer than 2 studies, skipping meta-analysis")
+        meta_results[[group_name]] <- NULL
         next
       }
       
       # Perform meta-analysis
-      tryCatch({
-        # Transform proportions
-        subset_data$prop_transformed <- metafor::escalc(
-          measure = "PFT",
-          xi = round(subset_data$resistance_rate * subset_data$sample_size_ab),
-          ni = subset_data$sample_size_ab
-        )$yi
-        
-        subset_data$se <- 1 / sqrt(subset_data$sample_size_ab)
-        
-        # Run meta-analysis
-        meta_result <- metafor::rma(
-          yi = prop_transformed,
-          sei = se,
+      meta_result <- try(
+        meta::metaprop(
+          event = group_data$n_resistant,
+          n = group_data$n_tested,
+          studlab = group_data$study_id,
           method = method,
-          data = subset_data
-        )
-        
-        # Store results
-        var_results[[as.character(val)]] <- list(
-          value = val,
-          model = meta_result,
-          pooled_rate = metafor::transf.ipft(meta_result$b),
-          ci_lower = metafor::transf.ipft(meta_result$ci.lb),
-          ci_upper = metafor::transf.ipft(meta_result$ci.ub),
-          heterogeneity = c(I2 = meta_result$I2, H2 = meta_result$H2, tau2 = meta_result$tau2),
-          k = meta_result$k
-        )
-      }, error = function(e) {
-        warning("Error in meta-analysis for ", var, "=", val, " - ", e$message)
-        var_results[[as.character(val)]] <- list(
-          value = val,
-          pooled_rate = NA,
-          ci_lower = NA,
-          ci_upper = NA,
-          heterogeneity = NA,
-          k = nrow(subset_data),
-          error = e$message
-        )
-      })
+          sm = measure,
+          ...
+        ),
+        silent = TRUE
+      )
+      
+      if (inherits(meta_result, "try-error")) {
+        warning("Meta-analysis failed for group '", group_name, "': ", as.character(meta_result))
+        meta_results[[group_name]] <- NULL
+      } else {
+        meta_results[[group_name]] <- meta_result
+      }
     }
     
-    # Test for subgroup differences if possible
-    subgroup_test <- NULL
-    tryCatch({
-      # Prepare data for meta-regression
-      data$prop_transformed <- metafor::escalc(
-        measure = "PFT",
-        xi = round(data$resistance_rate * data$sample_size_ab),
-        ni = data$sample_size_ab
-      )$yi
-      
-      data$se <- 1 / sqrt(data$sample_size_ab)
-      
-      # Perform meta-regression with subgroup as moderator
-      metareg <- metafor::rma(
-        yi = prop_transformed,
-        sei = se,
-        mods = ~ as.factor(get(var)),
+    # Calculate overall meta-analysis
+    overall_result <- try(
+      meta::metaprop(
+        event = data$n_resistant,
+        n = data$n_tested,
+        studlab = data$study_id,
         method = method,
-        data = data
-      )
+        sm = measure,
+        ...
+      ),
+      silent = TRUE
+    )
+    
+    if (inherits(overall_result, "try-error")) {
+      warning("Overall meta-analysis failed: ", as.character(overall_result))
+      overall_result <- NULL
+    }
+    
+    # Return results
+    return(list(
+      overall = overall_result,
+      by = meta_results,
+      grouping = by,
+      data = data
+    ))
+  }
+}
+
+#' Analyze heterogeneity
+#'
+#' Analyzes heterogeneity in meta-analysis results
+#'
+#' @param meta_result Meta-analysis result from calculate_pooled_rate
+#' @param detailed Logical; if TRUE, returns detailed heterogeneity statistics
+#'
+#' @return A data frame with heterogeneity statistics
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Analyze heterogeneity in meta-analysis results
+#' heterogeneity <- analyze_heterogeneity(meta_results)
+#' }
+analyze_heterogeneity <- function(meta_result, detailed = FALSE) {
+  # Check input
+  if (is.null(meta_result)) {
+    stop("Meta-analysis result is NULL")
+  }
+  
+  # Initialize results data frame
+  result <- data.frame(
+    group = character(),
+    k = integer(),            # Number of studies
+    Q = numeric(),            # Cochran's Q statistic
+    df = integer(),           # Degrees of freedom
+    p_value = numeric(),      # P-value for Q test
+    I2 = numeric(),           # I² statistic (%)
+    tau2 = numeric(),         # Tau² (between-study variance)
+    H = numeric(),            # H statistic
+    stringsAsFactors = FALSE
+  )
+  
+  # Function to extract heterogeneity statistics from a meta object
+  extract_stats <- function(meta_obj, group_name) {
+    if (is.null(meta_obj) || !inherits(meta_obj, "meta")) {
+      return(NULL)
+    }
+    
+    data.frame(
+      group = group_name,
+      k = meta_obj$k,
+      Q = meta_obj$Q,
+      df = meta_obj$df.Q,
+      p_value = meta_obj$pval.Q,
+      I2 = meta_obj$I2,
+      tau2 = meta_obj$tau2,
+      H = meta_obj$H,
+      stringsAsFactors = FALSE
+    )
+  }
+  
+  # Extract overall heterogeneity stats
+  if (!is.null(meta_result$overall)) {
+    overall_stats <- extract_stats(meta_result$overall, "Overall")
+    result <- rbind(result, overall_stats)
+  }
+  
+  # Extract heterogeneity stats for each group
+  if (!is.null(meta_result$by)) {
+    for (group_name in names(meta_result$by)) {
+      group_stats <- extract_stats(meta_result$by[[group_name]], group_name)
+      if (!is.null(group_stats)) {
+        result <- rbind(result, group_stats)
+      }
+    }
+  }
+  
+  # For detailed output, add interpretation and additional diagnostics
+  if (detailed && nrow(result) > 0) {
+    # Add I² interpretation
+    result$I2_interpretation <- cut(
+      result$I2,
+      breaks = c(-Inf, 25, 50, 75, Inf),
+      labels = c("Low", "Moderate", "Substantial", "Considerable"),
+      right = FALSE
+    )
+    
+    # Add heterogeneity significance
+    result$heterogeneity_significant <- result$p_value < 0.05
+    
+    # Add prediction intervals for random-effects models
+    if (!is.null(meta_result$overall) && meta_result$overall$method == "Inverse") {
+      result$PI_lower <- rep(NA, nrow(result))
+      result$PI_upper <- rep(NA, nrow(result))
       
-      # Test for subgroup differences
-      subgroup_test <- list(
-        QM = metareg$QM,
-        QMp = metareg$QMp,
-        R2 = metareg$R2,
-        model = metareg
-      )
-    }, error = function(e) {
-      warning("Could not test for subgroup differences in ", var, ": ", e$message)
-    })
-    
-    # Create summary data frame
-    summary_data <- data.frame(
-      variable = var,
-      value = sapply(var_results, function(x) x$value),
-      k = sapply(var_results, function(x) x$k),
-      pooled_rate = sapply(var_results, function(x) x$pooled_rate),
-      ci_lower = sapply(var_results, function(x) x$ci_lower),
-      ci_upper = sapply(var_results, function(x) x$ci_upper),
-      I2 = sapply(var_results, function(x) {
-        if (is.list(x$heterogeneity)) x$heterogeneity["I2"] else NA
-      }),
-      stringsAsFactors = FALSE,
-      row.names = NULL
-    )
-    
-    # Sort by pooled rate
-    summary_data <- summary_data[order(summary_data$pooled_rate, decreasing = TRUE), ]
-    
-    # Add to results
-    results$subgroups[[var]] <- list(
-      values = var_results,
-      subgroup_test = subgroup_test,
-      summary = summary_data
-    )
+      if (!is.null(meta_result$overall)) {
+        pi_overall <- meta_result$overall$lower.predict
+        result$PI_lower[result$group == "Overall"] <- meta_result$overall$lower.predict
+        result$PI_upper[result$group == "Overall"] <- meta_result$overall$upper.predict
+      }
+      
+      if (!is.null(meta_result$by)) {
+        for (i in 1:nrow(result)) {
+          group_name <- result$group[i]
+          if (group_name != "Overall" && !is.null(meta_result$by[[group_name]])) {
+            result$PI_lower[i] <- meta_result$by[[group_name]]$lower.predict
+            result$PI_upper[i] <- meta_result$by[[group_name]]$upper.predict
+          }
+        }
+      }
+    }
   }
   
-  # Create overall summary
-  all_summaries <- do.call(rbind, lapply(results$subgroups, function(x) x$summary))
-  if (nrow(all_summaries) > 0) {
-    results$summary <- all_summaries
+  return(result)
+}
+
+#' Perform subgroup analysis
+#'
+#' Performs meta-analysis by subgroups
+#'
+#' @param data Data frame containing standardized AMR data
+#' @param by Character vector of subgrouping variables
+#' @param meta_var Character vector of variables to include in meta-analysis
+#' @param method Meta-analysis method
+#' @param ... Additional parameters passed to calculate_pooled_rate
+#'
+#' @return A list containing subgroup meta-analysis results
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Perform subgroup analysis by region and year
+#' subgroup_results <- perform_subgroup_analysis(
+#'   standardized_data,
+#'   by = c("region", "year"),
+#'   meta_var = c("pathogen", "antibiotic")
+#' )
+#' }
+perform_subgroup_analysis <- function(data, by, meta_var = NULL, 
+                                   method = c("random", "fixed"), ...) {
+  method <- match.arg(method)
+  
+  # Check if subgrouping variables exist
+  missing_by <- by[!by %in% names(data)]
+  if (length(missing_by) > 0) {
+    stop("Subgrouping variables not found in data: ", paste(missing_by, collapse = ", "))
   }
   
-  return(results)
+  # If meta_var is NULL, just do simple subgroup analysis
+  if (is.null(meta_var)) {
+    return(calculate_pooled_rate(data, by = by, method = method, ...))
+  }
+  
+  # Check if meta variables exist
+  missing_meta <- meta_var[!meta_var %in% names(data)]
+  if (length(missing_meta) > 0) {
+    stop("Meta-analysis variables not found in data: ", paste(missing_meta, collapse = ", "))
+  }
+  
+  # Create subgroups
+  subgroups <- list()
+  
+  # Split by the 'by' variables first
+  if (length(by) == 1) {
+    subgroup_split <- split(data, data[[by]])
+  } else {
+    # Combine multiple grouping variables
+    subgroup_factor <- do.call(paste, c(data[by], sep = " | "))
+    subgroup_split <- split(data, subgroup_factor)
+  }
+  
+  # For each subgroup, perform meta-analysis by meta_var
+  for (subgroup_name in names(subgroup_split)) {
+    subgroup_data <- subgroup_split[[subgroup_name]]
+    
+    # Skip subgroups with insufficient data
+    if (nrow(subgroup_data) < 2) {
+      warning("Subgroup '", subgroup_name, "' has fewer than 2 studies, skipping")
+      next
+    }
+    
+    # Perform meta-analysis within this subgroup
+    subgroup_result <- calculate_pooled_rate(subgroup_data, by = meta_var, method = method, ...)
+    
+    # Save result
+    subgroups[[subgroup_name]] <- subgroup_result
+  }
+  
+  # Also calculate an overall result
+  overall_result <- calculate_pooled_rate(data, by = meta_var, method = method, ...)
+  
+  # Return results
+  return(list(
+    overall = overall_result,
+    subgroups = subgroups,
+    by_vars = by,
+    meta_vars = meta_var,
+    data = data
+  ))
 }
 
 #' Perform sensitivity analysis
 #'
-#' Perform sensitivity analysis by sequentially omitting studies
+#' Analyzes the influence of individual studies on meta-analysis results
 #'
-#' @param data A data frame containing AMR data
-#' @param by Variables to group by for separate sensitivity analyses
-#' @param method Meta-analysis method: "fixed" or "random"
+#' @param data Data frame containing standardized AMR data
+#' @param by Character vector of variables to group by
+#' @param method Meta-analysis method
+#' @param ... Additional parameters passed to calculate_pooled_rate
+#'
 #' @return A list containing sensitivity analysis results
 #' @export
+#'
 #' @examples
 #' \dontrun{
-#' data(human_amr)
-#' sensitivity <- perform_sensitivity_analysis(
-#'   human_amr,
-#'   by = c("pathogen", "antibiotic")
-#' )
+#' # Perform sensitivity analysis by removing each study
+#' sensitivity_results <- perform_sensitivity_analysis(standardized_data)
 #' }
-perform_sensitivity_analysis <- function(data, by = NULL, method = "random") {
-  # Check dependencies
-  if (!requireNamespace("metafor", quietly = TRUE)) {
-    stop("Package 'metafor' is required for this function")
-  }
+perform_sensitivity_analysis <- function(data, by = NULL, 
+                                      method = c("random", "fixed"), ...) {
+  method <- match.arg(method)
   
-  # Validate input
-  if (!is.data.frame(data)) {
-    stop("Input must be a data frame")
-  }
+  # Calculate overall meta-analysis
+  overall_result <- calculate_pooled_rate(data, by = by, method = method, ...)
   
-  # Required columns
-  required_cols <- c("resistance_rate", "sample_size_ab")
-  missing_cols <- setdiff(required_cols, colnames(data))
-  if (length(missing_cols) > 0) {
-    stop("Missing required columns: ", paste(missing_cols, collapse = ", "))
-  }
+  # Extract all unique study IDs
+  study_ids <- unique(data$study_id)
   
   # Initialize results list
-  results <- list(
-    overall = NULL,
-    by_group = list(),
-    method = method
+  sensitivity <- list(
+    overall = overall_result,
+    leave_one_out = list(),
+    influence = data.frame(
+      study_id = character(),
+      k_included = integer(),       # Number of studies included
+      original_estimate = numeric(), # Original pooled estimate
+      estimate_without = numeric(),  # Estimate without this study
+      absolute_change = numeric(),   # Absolute change in estimate
+      relative_change = numeric(),   # Relative change in estimate (%)
+      influence_score = numeric(),   # Influence score
+      stringsAsFactors = FALSE
+    )
   )
   
-  # Define sensitivity analysis function
-  run_sensitivity <- function(subset_data) {
-    # Skip if not enough data
-    if (nrow(subset_data) < 3) {
-      return(list(
-        leave_one_out = NULL,
-        influence = NULL,
-        warning = "Not enough data for sensitivity analysis (need at least 3 studies)"
-      ))
-    }
+  # Perform leave-one-out analysis
+  for (study_id in study_ids) {
+    # Remove this study
+    data_without <- subset(data, study_id != study_id)
     
-    # Transform proportions
-    subset_data$prop_transformed <- metafor::escalc(
-      measure = "PFT",
-      xi = round(subset_data$resistance_rate * subset_data$sample_size_ab),
-      ni = subset_data$sample_size_ab
-    )$yi
-    
-    subset_data$se <- 1 / sqrt(subset_data$sample_size_ab)
-    
-    # Run full meta-analysis
-    meta_result <- tryCatch({
-      metafor::rma(
-        yi = prop_transformed,
-        sei = se,
-        method = method,
-        data = subset_data
-      )
-    }, error = function(e) {
-      warning("Error in meta-analysis: ", e$message)
-      return(NULL)
-    })
-    
-    if (is.null(meta_result)) {
-      return(list(
-        leave_one_out = NULL,
-        influence = NULL,
-        warning = "Error in meta-analysis"
-      ))
-    }
-    
-    # Leave-one-out analysis
-    loo_results <- tryCatch({
-      metafor::leave1out(meta_result)
-    }, error = function(e) {
-      warning("Error in leave-one-out analysis: ", e$message)
-      return(NULL)
-    })
-    
-    # Influence diagnostics
-    influence_results <- tryCatch({
-      metafor::influence(meta_result)
-    }, error = function(e) {
-      warning("Error in influence analysis: ", e$message)
-      return(NULL)
-    })
-    
-    # Return results
-    return(list(
-      full_model = meta_result,
-      leave_one_out = loo_results,
-      influence = influence_results
-    ))
-  }
-  
-  # If no grouping variables, perform overall sensitivity analysis
-  if (is.null(by) || length(by) == 0) {
-    results$overall <- run_sensitivity(data)
-    return(results)
-  }
-  
-  # If grouping variables, perform sensitivity analysis for each group
-  if (!all(by %in% colnames(data))) {
-    stop("Not all grouping variables are in the data: ", 
-         paste(setdiff(by, colnames(data)), collapse = ", "))
-  }
-  
-  # Split data by groups
-  groups <- unique(data[, by, drop = FALSE])
-  
-  # For each group, perform sensitivity analysis
-  for (i in 1:nrow(groups)) {
-    # Extract group values
-    group_vals <- as.list(groups[i, ])
-    
-    # Create group identifier
-    group_id <- paste(
-      sapply(1:length(by), function(j) paste0(by[j], "=", group_vals[[by[j]]])),
-      collapse = ", "
-    )
-    
-    # Filter data for this group
-    filter_expr <- paste(
-      sapply(1:length(by), function(j) paste0("data$", by[j], " == '", group_vals[[by[j]]], "'")),
-      collapse = " & "
-    )
-    group_data <- subset(data, eval(parse(text = filter_expr)))
-    
-    # Run sensitivity analysis for this group
-    results$by_group[[group_id]] <- list(
-      values = group_vals,
-      sensitivity = run_sensitivity(group_data)
-    )
-  }
-  
-  return(results)
-}
-
-#' Compare with meta-analysis
-#'
-#' Compare local data with existing meta-analysis results
-#'
-#' @param local_data A data frame containing local AMR data
-#' @param meta_results Meta-analysis results from calculate_pooled_rate
-#' @param by Variables to group by for comparison
-#' @return A list containing comparison results
-#' @export
-#' @examples
-#' \dontrun{
-#' data(human_amr)
-#' 
-#' # Generate meta-analysis results
-#' meta_results <- calculate_pooled_rate(human_amr, by = c("pathogen", "antibiotic"))
-#' 
-#' # Compare local data with meta-analysis
-#' local_data <- data.frame(
-#'   pathogen = c("Ecoil", "KP"),
-#'   antibiotic = c("CIP", "TET"),
-#'   resistance_rate = c(0.65, 0.45),
-#'   sample_size_ab = c(100, 80)
-#' )
-#' 
-#' comparison <- compare_with_meta(local_data, meta_results, by = c("pathogen", "antibiotic"))
-#' }
-compare_with_meta <- function(local_data, meta_results, by) {
-  # Validate inputs
-  if (!is.data.frame(local_data)) {
-    stop("local_data must be a data frame")
-  }
-  
-  if (!is.list(meta_results) || is.null(meta_results$by_group)) {
-    stop("meta_results must be the output from calculate_pooled_rate()")
-  }
-  
-  if (!all(by %in% colnames(local_data))) {
-    stop("Not all grouping variables are in local_data: ", 
-         paste(setdiff(by, colnames(local_data)), collapse = ", "))
-  }
-  
-  required_cols <- c("resistance_rate")
-  missing_cols <- setdiff(required_cols, colnames(local_data))
-  if (length(missing_cols) > 0) {
-    stop("Missing required columns in local_data: ", paste(missing_cols, collapse = ", "))
-  }
-  
-  # Initialize results
-  results <- list(
-    comparisons = list(),
-    summary = NULL
-  )
-  
-  # Prepare data for comparison
-  comparison_data <- list()
-  
-  # For each row in local data, find matching meta-analysis group
-  for (i in 1:nrow(local_data)) {
-    local_row <- local_data[i, ]
-    
-    # Create group identifier
-    group_vals <- local_row[, by, drop = FALSE]
-    group_id <- paste(
-      sapply(1:length(by), function(j) paste0(by[j], "=", group_vals[[by[j]]])),
-      collapse = ", "
-    )
-    
-    # Find matching meta-analysis group
-    meta_group <- NULL
-    for (group_name in names(meta_results$by_group)) {
-      # Extract group values from meta-analysis
-      meta_vals <- meta_results$by_group[[group_name]]$values
-      
-      # Check if all grouping variables match
-      match <- TRUE
-      for (var in by) {
-        if (meta_vals[[var]] != local_row[[var]]) {
-          match <- FALSE
-          break
-        }
-      }
-      
-      if (match) {
-        meta_group <- meta_results$by_group[[group_name]]
-        break
-      }
-    }
-    
-    # If no matching group found, skip
-    if (is.null(meta_group)) {
-      warning("No matching meta-analysis group found for local data row ", i)
+    # Skip if insufficient data
+    if (nrow(data_without) < 2) {
+      warning("Removing study '", study_id, "' leaves fewer than 2 studies, skipping")
       next
     }
     
-    # Calculate z-score and p-value for difference
-    local_rate <- local_row$resistance_rate
-    meta_rate <- meta_group$pooled_rate
-    meta_ci_lower <- meta_group$ci_lower
-    meta_ci_upper <- meta_group$ci_upper
+    # Perform meta-analysis without this study
+    result_without <- calculate_pooled_rate(data_without, by = by, method = method, ...)
     
-    # Estimate standard error from confidence interval
-    meta_se <- (meta_ci_upper - meta_ci_lower) / (2 * 1.96)
+    # Save result
+    sensitivity$leave_one_out[[study_id]] <- result_without
     
-    # Standard error for local data (using Wilson score interval for proportions)
-    n <- local_row$sample_size_ab
-    if (is.null(n) || is.na(n)) {
-      n <- 30  # Default sample size if not provided
-      warning("sample_size_ab not provided for local data row ", i, ". Using default n=30.")
+    # Calculate influence metrics
+    if (!is.null(overall_result$overall) && !is.null(result_without$overall)) {
+      original_est <- overall_result$overall$TE.random
+      if (method == "fixed") {
+        original_est <- overall_result$overall$TE.fixed
+      }
+      
+      without_est <- result_without$overall$TE.random
+      if (method == "fixed") {
+        without_est <- result_without$overall$TE.fixed
+      }
+      
+      abs_change <- without_est - original_est
+      rel_change <- (abs_change / original_est) * 100
+      
+      # Simple influence score (higher = more influence)
+      influence_score <- abs(rel_change)
+      
+      # Add to influence table
+      new_row <- data.frame(
+        study_id = study_id,
+        k_included = nrow(data_without),
+        original_estimate = original_est,
+        estimate_without = without_est,
+        absolute_change = abs_change,
+        relative_change = rel_change,
+        influence_score = influence_score,
+        stringsAsFactors = FALSE
+      )
+      
+      sensitivity$influence <- rbind(sensitivity$influence, new_row)
     }
-    local_se <- sqrt((local_rate * (1 - local_rate)) / n)
-    
-    # Calculate z-score and p-value
-    z_score <- (local_rate - meta_rate) / sqrt(meta_se^2 + local_se^2)
-    p_value <- 2 * pnorm(-abs(z_score))
-    
-    # Determine if local rate is significantly different
-    significant <- p_value < 0.05
-    direction <- if (local_rate > meta_rate) "higher" else if (local_rate < meta_rate) "lower" else "same"
-    
-    # Store comparison
-    comparison <- list(
-      local = list(
-        rate = local_rate,
-        se = local_se,
-        sample_size = n
-      ),
-      meta = list(
-        rate = meta_rate,
-        ci_lower = meta_ci_lower,
-        ci_upper = meta_ci_upper,
-        se = meta_se,
-        k = meta_group$k
-      ),
-      difference = list(
-        absolute = local_rate - meta_rate,
-        percentage = (local_rate - meta_rate) / meta_rate * 100,
-        z_score = z_score,
-        p_value = p_value,
-        significant = significant,
-        direction = direction
-      ),
-      group_values = as.list(group_vals)
-    )
-    
-    # Add to comparison data
-    comparison_data[[length(comparison_data) + 1]] <- comparison
   }
   
-  # Store all comparisons
-  results$comparisons <- comparison_data
-  
-  # Create summary data frame
-  if (length(comparison_data) > 0) {
-    summary_df <- data.frame(
-      stringsAsFactors = FALSE,
-      row.names = NULL
-    )
-    
-    # Add group variables
-    for (var in by) {
-      summary_df[[var]] <- sapply(comparison_data, function(x) x$group_values[[var]])
-    }
-    
-    # Add comparison metrics
-    summary_df$local_rate <- sapply(comparison_data, function(x) x$local$rate)
-    summary_df$meta_rate <- sapply(comparison_data, function(x) x$meta$rate)
-    summary_df$absolute_diff <- sapply(comparison_data, function(x) x$difference$absolute)
-    summary_df$percentage_diff <- sapply(comparison_data, function(x) x$difference$percentage)
-    summary_df$z_score <- sapply(comparison_data, function(x) x$difference$z_score)
-    summary_df$p_value <- sapply(comparison_data, function(x) x$difference$p_value)
-    summary_df$significant <- sapply(comparison_data, function(x) x$difference$significant)
-    summary_df$direction <- sapply(comparison_data, function(x) x$difference$direction)
-    
-    # Sort by absolute difference
-    summary_df <- summary_df[order(abs(summary_df$absolute_diff), decreasing = TRUE), ]
-    
-    results$summary <- summary_df
+  # Sort influence by score
+  if (nrow(sensitivity$influence) > 0) {
+    sensitivity$influence <- sensitivity$influence[
+      order(sensitivity$influence$influence_score, decreasing = TRUE), 
+    ]
   }
   
-  return(results)
+  # Calculate some summary stats for the influence analysis
+  if (nrow(sensitivity$influence) > 0) {
+    sensitivity$summary <- list(
+      max_influence = max(sensitivity$influence$influence_score),
+      mean_influence = mean(sensitivity$influence$influence_score),
+      max_study = sensitivity$influence$study_id[which.max(sensitivity$influence$influence_score)],
+      direction_changes = sum(sign(sensitivity$influence$original_estimate) != 
+                             sign(sensitivity$influence$estimate_without))
+    )
+  }
+  
+  return(sensitivity)
+}
+
+#' Assess publication bias
+#'
+#' Evaluates potential publication bias in meta-analysis data
+#'
+#' @param data Data frame containing standardized AMR data
+#' @param by Character vector of variables to group by
+#' @param methods Character vector of methods to use for publication bias assessment
+#'
+#' @return A list containing publication bias assessment results
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Assess publication bias using multiple methods
+#' bias_results <- assess_publication_bias(
+#'   standardized_data,
+#'   methods = c("funnel", "egger", "trim_fill")
+#' )
+#' }
+assess_publication_bias <- function(data, by = NULL, 
+                                  methods = c("funnel", "egger", "trim_fill")) {
+  # Check for meta and metafor packages
+  if (!requireNamespace("meta", quietly = TRUE)) {
+    stop("Package 'meta' is required for this function. Please install it.")
+  }
+  
+  if ("trim_fill" %in% methods && !requireNamespace("metafor", quietly = TRUE)) {
+    warning("Package 'metafor' is required for trim-and-fill method. This method will be skipped.")
+    methods <- methods[methods != "trim_fill"]
+  }
+  
+  # Validate methods
+  valid_methods <- c("funnel", "egger", "trim_fill")
+  invalid_methods <- methods[!methods %in% valid_methods]
+  if (length(invalid_methods) > 0) {
+    warning("Invalid methods specified: ", paste(invalid_methods, collapse = ", "), 
+            ". Will use only valid methods.")
+    methods <- methods[methods %in% valid_methods]
+  }
+  
+  if (length(methods) == 0) {
+    stop("No valid methods specified for publication bias assessment.")
+  }
+  
+  # Prepare data for analysis
+  if (is.null(by)) {
+    # Single meta-analysis for all data
+    meta_result <- try(
+      meta::metaprop(
+        event = data$n_resistant,
+        n = data$n_tested,
+        studlab = data$study_id,
+        method = "Inverse",
+        sm = "PR"
+      ),
+      silent = TRUE
+    )
+    
+    if (inherits(meta_result, "try-error")) {
+      warning("Meta-analysis failed: ", as.character(meta_result))
+      return(NULL)
+    }
+    
+    # Initialize results list
+    results <- list(
+      by = NULL,
+      funnel = NULL,
+      egger = NULL,
+      trim_fill = NULL
+    )
+    
+    # Perform publication bias assessments
+    if ("funnel" %in% methods) {
+      # Funnel plot asymmetry
+      results$funnel <- meta_result
+    }
+    
+    if ("egger" %in% methods) {
+      # Egger's test
+      if (meta_result$k >= 10) {
+        egger_test <- meta::metabias(meta_result, method = "linreg")
+        results$egger <- egger_test
+      } else {
+        warning("At least 10 studies are required for Egger's test. Skipping.")
+      }
+    }
+    
+    if ("trim_fill" %in% methods) {
+      # Trim and fill analysis using metafor
+      if (meta_result$k >= 3) {
+        # Convert meta object to rma object for metafor
+        es <- meta_result$TE
+        se <- meta_result$seTE
+        
+        trim_fill <- try(
+          metafor::trimfill(metafor::rma(yi = es, sei = se)),
+          silent = TRUE
+        )
+        
+        if (!inherits(trim_fill, "try-error")) {
+          results$trim_fill <- trim_fill
+        } else {
+          warning("Trim and fill analysis failed: ", as.character(trim_fill))
+        }
+      } else {
+        warning("At least 3 studies are required for trim and fill analysis. Skipping.")
+      }
+    }
+    
+    return(results)
+  } else {
+    # Grouped meta-analysis
+    if (length(by) == 1) {
+      groups <- data[[by]]
+    } else {
+      # Combine multiple grouping variables
+      groups <- do.call(paste, c(data[by], sep = " | "))
+    }
+    
+    # Split data by groups
+    grouped_data <- split(data, groups)
+    
+    # Perform publication bias assessment for each group
+    group_results <- list()
+    
+    for (group_name in names(grouped_data)) {
+      group_data <- grouped_data[[group_name]]
+      
+      # Skip groups with insufficient studies
+      if (nrow(group_data) < 3) {
+        warning("Group '", group_name, "' has fewer than 3 studies, skipping publication bias assessment")
+        next
+      }
+      
+      # Perform meta-analysis for this group
+      meta_result <- try(
+        meta::metaprop(
+          event = group_data$n_resistant,
+          n = group_data$n_tested,
+          studlab = group_data$study_id,
+          method = "Inverse",
+          sm = "PR"
+        ),
+        silent = TRUE
+      )
+      
+      if (inherits(meta_result, "try-error")) {
+        warning("Meta-analysis failed for group '", group_name, "': ", as.character(meta_result))
+        next
+      }
+      
+      # Initialize results for this group
+      group_result <- list(
+        funnel = NULL,
+        egger = NULL,
+        trim_fill = NULL
+      )
+      
+      # Perform publication bias assessments
+      if ("funnel" %in% methods) {
+        # Funnel plot data
+        group_result$funnel <- meta_result
+      }
+      
+      if ("egger" %in% methods) {
+        # Egger's test
+        if (meta_result$k >= 10) {
+          egger_test <- meta::metabias(meta_result, method = "linreg")
+          group_result$egger <- egger_test
+        } else {
+          message("Group '", group_name, "' has fewer than 10 studies, skipping Egger's test")
+        }
+      }
+      
+      if ("trim_fill" %in% methods) {
+        # Trim and fill analysis using metafor
+        if (meta_result$k >= 3) {
+          # Convert meta object to rma object for metafor
+          es <- meta_result$TE
+          se <- meta_result$seTE
+          
+          trim_fill <- try(
+            metafor::trimfill(metafor::rma(yi = es, sei = se)),
+            silent = TRUE
+          )
+          
+          if (!inherits(trim_fill, "try-error")) {
+            group_result$trim_fill <- trim_fill
+          } else {
+            warning("Trim and fill analysis failed for group '", group_name, "': ", as.character(trim_fill))
+          }
+        } else {
+          message("Group '", group_name, "' has fewer than 3 studies, skipping trim and fill analysis")
+        }
+      }
+      
+      # Save results for this group
+      group_results[[group_name]] <- group_result
+    }
+    
+    # Return results
+    return(list(
+      by = by,
+      groups = group_results
+    ))
+  }
 } 

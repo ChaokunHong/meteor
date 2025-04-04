@@ -1,204 +1,201 @@
 ---
-title: "Introduction to meteor"
-author: "Your Name"
+title: "Introduction to METEOR"
+author: "METEOR Team"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Introduction to meteor}
+  %\VignetteIndexEntry{Introduction to METEOR}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r setup, include = FALSE}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
 )
 ```
 
-# Introduction
+# METEOR: Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms
 
-METEOR (Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms) is an R package designed to help researchers analyze antimicrobial resistance (AMR) data across human, animal, and environmental domains. This vignette provides a quick introduction to the main functionality of the package.
+## Introduction
+
+Antimicrobial resistance (AMR) is a global health threat that requires coordinated monitoring and analysis across different domains: human, animal, and environment. METEOR (Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms) is an R package designed to facilitate meta-analysis of AMR data across these domains.
+
+This vignette provides an introduction to the basic functionality of the METEOR package, demonstrating how to import data, perform meta-analyses, and create visualizations.
 
 ## Installation
 
-You can install the development version of meteor from GitHub:
+You can install the METEOR package from GitHub:
 
 ```{r, eval=FALSE}
 # Install devtools if not already installed
-# install.packages("devtools")
+if (!requireNamespace("devtools", quietly = TRUE)) {
+  install.packages("devtools")
+}
+
+# Install meteor from GitHub
 devtools::install_github("username/meteor")
 ```
 
-## Loading the Package
+Once installed, you can load the package:
 
-```{r}
+```{r, eval=FALSE}
 library(meteor)
 ```
 
-# Basic Workflow
+## Basic Workflow
 
-The typical workflow with meteor includes:
+### 1. Setting Up a Project
 
-1. Loading and validating data
-2. Performing meta-analysis
-3. Visualizing the results
-4. Generating reports
-
-## Loading Data
-
-METEOR comes with built-in human AMR data:
-
-```{r}
-# Load the built-in human AMR data
-data(human_amr)
-
-# Examine the structure of the data
-str(human_amr, max.level = 1)
-```
-
-You can also import your own data:
+To get started, you can create a new METEOR project structure:
 
 ```{r, eval=FALSE}
-# Import AMR data from a CSV file
-my_data <- import_amr_data("path/to/your/data.csv")
-
-# Or from Excel
-excel_data <- import_amr_data("path/to/your/data.xlsx")
+initialize_meteor_project("my_amr_analysis")
 ```
 
-## Data Validation and Standardization
+This creates a directory structure with folders for data, analysis, results, and reports.
 
-Before analysis, it's important to validate and standardize your data:
+### 2. Importing Data
 
-```{r}
+METEOR supports importing data from various file formats:
+
+```{r, eval=FALSE}
+# Import from CSV
+amr_data <- import_amr_data("path/to/data.csv")
+
+# Import from Excel
+amr_data <- import_amr_data("path/to/data.xlsx", sheet = "Resistance_Data")
+
+# Using built-in data
+data(human_data)
+```
+
+### 3. Data Validation and Standardization
+
+Before analysis, you should validate and standardize your data:
+
+```{r, eval=FALSE}
 # Validate data
-validation <- validate_data(human_amr)
+validated_data <- validate_data(amr_data, domain = "human")
 
-if (validation$valid) {
-  cat("Data validation successful!\n")
-} else {
-  cat("Data validation issues found:\n")
-  print(validation$issues)
-}
+# Check data quality
+quality_check <- check_data_quality(validated_data)
+print(attr(quality_check, "quality"))
 
 # Standardize data
-std_data <- standardize_amr_data(human_amr)
+std_data <- standardize_amr_data(validated_data, domain = "human")
 ```
 
-## Filtering Data
+### 4. Meta-Analysis
 
-You can filter data to focus on specific subsets:
+Perform meta-analysis on the standardized data:
 
-```{r}
-# Filter data to specific pathogens and antibiotics
-filtered_data <- filter_amr_data(
-  human_amr,
-  pathogen = c("Ecoil", "KP"),
-  antibiotic = c("CIP", "TET"),
-  year_range = c(2010, 2020)
-)
+```{r, eval=FALSE}
+# Basic meta-analysis
+meta_results <- calculate_pooled_rate(std_data)
 
-# Check how many records we have after filtering
-nrow(filtered_data)
-```
-
-## Meta-Analysis
-
-The core functionality of METEOR is to perform meta-analysis on AMR data:
-
-```{r}
-# Perform meta-analysis grouped by pathogen and antibiotic
-results <- calculate_pooled_rate(
-  data = filtered_data,
+# Meta-analysis by pathogen and antibiotic
+grouped_meta <- calculate_pooled_rate(
+  std_data,
   by = c("pathogen", "antibiotic"),
   method = "random"
 )
 
-# Look at the summary of results
-summary_table <- results$summary
-head(summary_table)
-```
-
-## Heterogeneity Analysis
-
-You can analyze heterogeneity in your meta-analysis:
-
-```{r}
 # Analyze heterogeneity
-heterogeneity <- analyze_heterogeneity(filtered_data, by = c("pathogen", "antibiotic"))
+heterogeneity <- analyze_heterogeneity(grouped_meta)
+print(heterogeneity)
 
-# Look at the heterogeneity summary
-heterogeneity$summary
-```
-
-## Visualization
-
-METEOR provides various visualization functions:
-
-```{r, fig.width=8, fig.height=6}
-# Create a forest plot
-forest_plot <- create_forest_plot(results)
-print(forest_plot)
-```
-
-```{r, fig.width=8, fig.height=6}
-# Create a heatmap of resistance rates
-heatmap <- create_resistance_heatmap(
-  data = filtered_data,
-  x_var = "pathogen",
-  y_var = "antibiotic"
+# Perform subgroup analysis
+subgroup_results <- perform_subgroup_analysis(
+  std_data,
+  by = c("region"),
+  meta_var = c("pathogen", "antibiotic")
 )
-print(heatmap)
+
+# Sensitivity analysis
+sensitivity <- perform_sensitivity_analysis(std_data)
 ```
 
-## Interactive Shiny App
+### 5. Visualization
 
-METEOR includes an interactive Shiny app for exploring AMR data:
+Create visualizations of the meta-analysis results:
 
 ```{r, eval=FALSE}
-# Launch the Shiny app
-launch_meteor(data = human_amr)
+# Create forest plot
+forest_plot <- create_forest_plot(grouped_meta)
+
+# Create interactive forest plot
+interactive_forest <- create_interactive_forest(grouped_meta)
+
+# Create cumulative forest plot
+cumulative_forest <- create_cumulative_forest(meta_results, order_by = "year")
 ```
 
-# Working with Local Data
+### 6. Reporting
 
-You can compare your local data with existing meta-analysis results:
-
-```{r}
-# Create sample local data
-local_data <- data.frame(
-  pathogen = c("Ecoil", "KP"),
-  antibiotic = c("CIP", "TET"),
-  resistance_rate = c(0.65, 0.45),
-  sample_size_ab = c(100, 80)
-)
-
-# Compare with meta-analysis results
-comparison <- compare_with_meta(
-  local_data = local_data,
-  meta_results = results,
-  by = c("pathogen", "antibiotic")
-)
-
-# Check comparison results
-comparison$summary
-```
-
-# Project Management
-
-METEOR helps you organize your AMR meta-analysis projects:
+Generate reports of your findings:
 
 ```{r, eval=FALSE}
-# Initialize a new project
-initialize_meteor_project("path/to/projects", "my_amr_analysis")
+# Generate summary report (not implemented yet)
+# generate_summary_report(meta_results, output_file = "amr_summary_report.html")
 ```
 
-# Conclusion
+## Example: Meta-Analysis of E. coli Resistance
 
-METEOR provides a comprehensive toolkit for meta-analysis of antimicrobial resistance data. This vignette covers the basic functionality, but there are many more features available. Check the documentation for more details.
+Below is a complete example workflow using sample data:
 
-```{r}
-# Get help on specific topics
-meteor_help("analysis")
-``` 
+```{r, eval=FALSE}
+# Load package
+library(meteor)
+
+# Load sample data
+data(standardized_human_data)
+
+# Filter for E. coli and ciprofloxacin
+ecoli_cip <- standardized_human_data %>%
+  dplyr::filter(
+    pathogen == "Escherichia coli",
+    antibiotic == "Ciprofloxacin"
+  )
+
+# Perform meta-analysis
+ecoli_meta <- calculate_pooled_rate(ecoli_cip)
+
+# Create forest plot
+create_forest_plot(
+  ecoli_meta,
+  title = "Meta-Analysis of E. coli Resistance to Ciprofloxacin",
+  xlab = "Resistance Rate"
+)
+
+# Analyze heterogeneity
+heterogeneity <- analyze_heterogeneity(ecoli_meta, detailed = TRUE)
+print(heterogeneity)
+
+# Check for publication bias
+bias <- assess_publication_bias(ecoli_cip)
+```
+
+## Using the Shiny App
+
+For a more interactive experience, you can use the METEOR Shiny application:
+
+```{r, eval=FALSE}
+# Launch the METEOR Shiny app
+launch_meteor()
+```
+
+This opens an interactive web application where you can import data, perform analyses, and create visualizations through a graphical user interface.
+
+## Conclusion
+
+METEOR provides a comprehensive set of tools for meta-analysis of antimicrobial resistance data. This vignette covered the basic workflow - importing data, performing meta-analyses, and creating visualizations. For more detailed information on specific functions, please refer to the function documentation.
+
+## References
+
+1. DerSimonian, R., & Laird, N. (1986). Meta-analysis in clinical trials. Controlled Clinical Trials, 7(3), 177-188.
+2. Schwarzer, G. (2007). meta: An R package for meta-analysis. R News, 7(3), 40-45.
+3. World Health Organization. (2014). Antimicrobial resistance: global report on surveillance. World Health Organization. 

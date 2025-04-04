@@ -1,349 +1,309 @@
-#' Get the meteor package version
+#' Get METEOR package version
 #'
-#' @return A character string indicating the current version of the meteor package
+#' @return Character string with version information
 #' @export
+#'
 #' @examples
 #' meteor_version()
 meteor_version <- function() {
-  pkg_version <- utils::packageVersion("meteor")
-  return(as.character(pkg_version))
+  packageVersion("meteor")
 }
 
-#' Initialize a meteor project
+#' Initialize a new METEOR project
 #'
-#' Creates a directory structure for a new meteor project
+#' Creates a new directory structure for a METEOR project
 #'
-#' @param path Path where the project should be created
-#' @param project_name Name of the project
-#' @param overwrite Whether to overwrite existing files (default: FALSE)
+#' @param project_name Character string with the name of the project
+#' @param path Path where the project should be created. Default is current directory.
+#' @param overwrite Logical indicating whether to overwrite existing project. Default is FALSE.
+#'
 #' @return Invisibly returns the path to the created project
 #' @export
+#'
 #' @examples
 #' \dontrun{
-#' initialize_meteor_project("path/to/projects", "my_amr_analysis")
+#' initialize_meteor_project("my_amr_analysis")
 #' }
-initialize_meteor_project <- function(path, project_name, overwrite = FALSE) {
-  # Create full project path
-  project_path <- file.path(path, project_name)
+initialize_meteor_project <- function(project_name, path = getwd(), overwrite = FALSE) {
+  # Check if the project name is valid
+  if (!grepl("^[a-zA-Z][a-zA-Z0-9_]*$", project_name)) {
+    stop("Project name must start with a letter and can only contain letters, numbers, and underscores.")
+  }
+  
+  # Create full path
+  project_dir <- file.path(path, project_name)
   
   # Check if directory exists
-  if (dir.exists(project_path) && !overwrite) {
-    stop("Project directory already exists. Set overwrite = TRUE to overwrite.")
+  if (dir.exists(project_dir)) {
+    if (!overwrite) {
+      stop("Project directory already exists. Use overwrite = TRUE to replace it.")
+    } else {
+      # Remove directory and contents
+      unlink(project_dir, recursive = TRUE)
+    }
   }
   
   # Create main directory
-  dir.create(project_path, recursive = TRUE, showWarnings = FALSE)
+  dir.create(project_dir, showWarnings = FALSE, recursive = TRUE)
   
   # Create subdirectories
   dirs <- c(
-    "data/raw",
-    "data/processed",
-    "analysis",
-    "reports",
-    "figures"
+    "data", 
+    "data/raw", 
+    "data/processed", 
+    "analysis", 
+    "results",
+    "results/figures",
+    "results/tables", 
+    "reports"
   )
   
   for (d in dirs) {
-    dir.create(file.path(project_path, d), recursive = TRUE, showWarnings = FALSE)
+    dir.create(file.path(project_dir, d), showWarnings = FALSE, recursive = TRUE)
   }
   
   # Create README file
   readme_content <- paste0(
     "# ", project_name, "\n\n",
-    "Project created with meteor version ", meteor_version(), "\n\n",
-    "## Structure\n\n",
-    "- data/raw: Place raw data files here\n",
-    "- data/processed: Processed data will be stored here\n",
+    "This is a METEOR project for antimicrobial resistance analysis.\n\n",
+    "## Project Structure\n\n",
+    "- data/raw: Raw data files\n",
+    "- data/processed: Processed data files\n",
     "- analysis: R scripts for analysis\n",
-    "- reports: Generated reports\n",
-    "- figures: Saved visualizations\n\n",
-    "## Usage\n\n",
-    "```r\n",
-    "library(meteor)\n",
+    "- results/figures: Generated figures\n",
+    "- results/tables: Generated tables\n",
+    "- reports: Generated reports\n\n",
+    "Created with [METEOR package](https://github.com/username/meteor) version ", packageVersion("meteor"), "\n"
+  )
+  
+  writeLines(readme_content, file.path(project_dir, "README.md"))
+  
+  # Create sample script
+  script_content <- paste0(
+    "# ", project_name, " Analysis\n\n",
+    "# Load packages\n",
+    "library(meteor)\n\n",
     "# Import data\n",
-    "data <- import_amr_data('data/raw/your_data.csv')\n",
-    "# More analysis steps...\n",
-    "```\n"
+    "# amr_data <- import_amr_data('data/raw/your_data_file.csv')\n\n",
+    "# Validate data\n",
+    "# validated_data <- validate_data(amr_data)\n\n",
+    "# Perform analysis\n",
+    "# results <- calculate_pooled_rate(validated_data)\n\n",
+    "# Create visualizations\n",
+    "# forest_plot <- create_forest_plot(results)\n\n",
+    "# Save results\n",
+    "# export_plot(forest_plot, 'results/figures/forest_plot.png')\n\n",
+    "# Generate report\n",
+    "# generate_summary_report(results, output_file = 'reports/summary_report.html')\n"
   )
   
-  writeLines(readme_content, file.path(project_path, "README.md"))
+  writeLines(script_content, file.path(project_dir, "analysis", paste0(project_name, "_analysis.R")))
   
-  # Create example analysis script
-  example_script <- c(
-    "# Example AMR analysis with meteor",
-    "",
-    "library(meteor)",
-    "",
-    "# Import data",
-    "# data <- import_amr_data('data/raw/your_data.csv')",
-    "",
-    "# Use built-in data",
-    "data(human_amr)",
-    "",
-    "# Validate data",
-    "validated_data <- validate_data(human_amr)",
-    "",
-    "# Run meta-analysis",
-    "meta_results <- calculate_pooled_rate(",
-    "  data = validated_data,",
-    "  by = c('pathogen', 'antibiotic'),",
-    "  method = 'random'",
-    ")",
-    "",
-    "# Create visualization",
-    "forest_plot <- create_forest_plot(meta_results)",
-    "",
-    "# Save visualization",
-    "# save_plot(forest_plot, 'figures/forest_plot.png')",
-    "",
-    "# Generate report",
-    "# generate_summary_report(",
-    "#   data = validated_data,",
-    "#   results = meta_results,",
-    "#   plots = list(forest_plot),",
-    "#   output_file = 'reports/summary_report.html'",
-    "# )"
-  )
-  
-  writeLines(example_script, file.path(project_path, "analysis", "example_analysis.R"))
-  
-  message("Project created at: ", project_path)
-  return(invisible(project_path))
+  message("METEOR project '", project_name, "' created at ", project_dir)
+  return(invisible(project_dir))
 }
 
-#' Set meteor options
+#' METEOR package options
 #'
-#' Set global options for the meteor package
+#' A list containing global options for the METEOR package
+#'
+#' @export
+#'
+#' @examples
+#' # Access current options
+#' meteor_options()
+meteor_options <- new.env(parent = emptyenv())
+
+# Initialize default options
+meteor_options$default_meta_method <- "REML"  # Default meta-analysis method
+meteor_options$confidence_level <- 0.95  # Default confidence level
+meteor_options$color_palette <- "viridis"  # Default color palette
+meteor_options$na_handling <- "omit"  # Default NA handling strategy
+meteor_options$significant_digits <- 3  # Default number of significant digits for reporting
+meteor_options$show_warnings <- TRUE  # Show warnings by default
+
+#' Set global options for METEOR package
 #'
 #' @param ... Named options to set
+#' @param reset Logical; if TRUE, reset all options to defaults
+#'
 #' @return Invisibly returns the updated options
 #' @export
+#'
 #' @examples
-#' set_meteor_options(forest_plot_height = 800, map_color_scheme = "viridis")
-set_meteor_options <- function(...) {
-  # Define the option name prefix
-  prefix <- "meteor."
-  
-  # Get the options passed to the function
-  opts <- list(...)
-  
-  # Check if options are named
-  if (length(opts) > 0 && is.null(names(opts))) {
-    stop("All options must be named.")
-  }
-  
-  # Set each option
-  for (i in seq_along(opts)) {
-    opt_name <- names(opts)[i]
-    opt_value <- opts[[i]]
-    full_name <- paste0(prefix, opt_name)
-    options(setNames(list(opt_value), full_name))
-  }
-  
-  # Return all meteor options
-  return(invisible(get_meteor_options()))
-}
-
-#' Get meteor options
+#' # Set confidence level
+#' set_meteor_options(confidence_level = 0.99)
 #'
-#' Get current global options for the meteor package
-#'
-#' @param option_name Optional name of a specific option to retrieve
-#' @return A list of all meteor options or a single option value
-#' @export
-#' @examples
-#' get_meteor_options()
-#' get_meteor_options("forest_plot_height")
-get_meteor_options <- function(option_name = NULL) {
-  # Define the option name prefix
-  prefix <- "meteor."
-  
-  # Get all options
-  all_options <- options()
-  
-  # Filter for meteor options
-  meteor_options <- all_options[grep(paste0("^", prefix), names(all_options))]
-  
-  # Remove the prefix from option names
-  names(meteor_options) <- gsub(prefix, "", names(meteor_options))
-  
-  # Return specific option if requested
-  if (!is.null(option_name)) {
-    full_name <- paste0(prefix, option_name)
-    return(getOption(full_name))
-  }
-  
-  return(meteor_options)
-}
-
-#' Check package dependencies
-#'
-#' Check if all required packages for a specific functionality are installed
-#'
-#' @param feature Feature to check dependencies for (e.g., "visualization", "analysis")
-#' @param quietly If TRUE, suppresses messages about installed packages
-#' @return Logical indicating whether all dependencies are installed
-#' @export
-#' @examples
-#' check_dependencies("visualization")
-check_dependencies <- function(feature = NULL, quietly = FALSE) {
-  # Define dependencies for each feature
-  deps <- list(
-    core = c("dplyr", "stringr", "tidyr", "readr"),
-    visualization = c("ggplot2", "plotly", "leaflet"),
-    analysis = c("metafor", "meta"),
-    shiny = c("shiny", "DT", "htmltools", "shinydashboard"),
-    reporting = c("rmarkdown", "knitr")
-  )
-  
-  # If no feature specified, check all dependencies
-  if (is.null(feature)) {
-    all_deps <- unique(unlist(deps))
-    feature_deps <- all_deps
-  } else if (feature %in% names(deps)) {
-    feature_deps <- deps[[feature]]
+#' # Reset to defaults
+#' set_meteor_options(reset = TRUE)
+set_meteor_options <- function(..., reset = FALSE) {
+  if (reset) {
+    meteor_options$default_meta_method <- "REML"
+    meteor_options$confidence_level <- 0.95
+    meteor_options$color_palette <- "viridis"
+    meteor_options$na_handling <- "omit"
+    meteor_options$significant_digits <- 3
+    meteor_options$show_warnings <- TRUE
   } else {
-    stop("Unknown feature: ", feature, ". Available features: ", 
-         paste(names(deps), collapse = ", "))
-  }
-  
-  # Check if packages are installed
-  installed <- vapply(feature_deps, function(pkg) {
-    is_installed <- requireNamespace(pkg, quietly = TRUE)
-    if (!quietly && is_installed) {
-      message("Package '", pkg, "' is installed.")
-    } else if (!quietly && !is_installed) {
-      message("Package '", pkg, "' is NOT installed.")
+    args <- list(...)
+    if (length(args) == 0) {
+      warning("No options provided. Use get_meteor_options() to see current options.")
+    } else {
+      for (option_name in names(args)) {
+        meteor_options[[option_name]] <- args[[option_name]]
+      }
     }
-    return(is_installed)
-  }, logical(1))
-  
-  all_installed <- all(installed)
-  
-  if (!all_installed && !quietly) {
-    missing_pkgs <- feature_deps[!installed]
-    message("Missing packages: ", paste(missing_pkgs, collapse = ", "), 
-            ". Use install.packages() to install them.")
   }
   
-  return(all_installed)
+  return(invisible(as.list(meteor_options)))
 }
 
-#' Display help information for meteor package
+#' Get current global options for METEOR package
 #'
-#' @param topic Specific topic to get help on (NULL for general help)
+#' @return A list of current options
+#' @export
+#'
+#' @examples
+#' # Get all options
+#' get_meteor_options()
+get_meteor_options <- function() {
+  as.list(meteor_options)
+}
+
+#' Display help information for METEOR package
+#'
+#' @param topic Optional topic to get help on (function name or category)
+#'
 #' @return Invisibly returns NULL
 #' @export
+#'
 #' @examples
+#' # General help
 #' meteor_help()
-#' meteor_help("visualization")
+#'
+#' # Help on a specific topic
+#' meteor_help("import_amr_data")
 meteor_help <- function(topic = NULL) {
-  # Define help topics
-  help_topics <- list(
-    general = c(
-      "meteor: Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms",
-      "",
-      "Main functions:",
-      "  - initialize_meteor_project(): Create a new project structure",
-      "  - import_amr_data(): Import AMR data from various sources",
-      "  - launch_meteor(): Launch the Shiny application",
-      "",
-      "For more information on specific topics, try:",
-      "  meteor_help(\"data\")",
-      "  meteor_help(\"analysis\")",
-      "  meteor_help(\"visualization\")",
-      "  meteor_help(\"shiny\")"
-    ),
-    
-    data = c(
-      "Data Management Functions:",
-      "",
-      "  - import_amr_data(): Import AMR data from CSV, Excel, or RData files",
-      "  - import_local_data(): Import researcher's local data",
-      "  - validate_data(): Check data integrity and structure",
-      "  - standardize_amr_data(): Standardize data fields",
-      "  - filter_amr_data(): Filter data by various criteria",
-      "",
-      "Built-in datasets:",
-      "  - human_amr: Human AMR data from published studies"
-    ),
-    
-    analysis = c(
-      "Analysis Functions:",
-      "",
-      "  - calculate_pooled_rate(): Calculate pooled resistance rates",
-      "  - analyze_heterogeneity(): Analyze between-study heterogeneity",
-      "  - perform_subgroup_analysis(): Perform analysis by subgroups",
-      "  - perform_sensitivity_analysis(): Assess sensitivity of results",
-      "  - perform_meta_regression(): Conduct meta-regression analysis",
-      "  - compare_with_meta(): Compare local data with meta-analysis results"
-    ),
-    
-    visualization = c(
-      "Visualization Functions:",
-      "",
-      "  - create_forest_plot(): Create forest plots for meta-analysis results",
-      "  - create_geo_map(): Create geographic maps of resistance rates",
-      "  - create_resistance_heatmap(): Create heatmaps of resistance patterns",
-      "  - create_trend_plot(): Visualize resistance trends over time",
-      "  - create_comparison_plot(): Compare resistance across domains or regions"
-    ),
-    
-    shiny = c(
-      "Shiny Application Functions:",
-      "",
-      "  - launch_meteor(): Launch the main Shiny application",
-      "  - run_module(): Run a specific Shiny module",
-      "",
-      "Available modules:",
-      "  - forest_plot_module: Interactive forest plots",
-      "  - map_module: Geographic visualization",
-      "  - trend_module: Resistance trend analysis",
-      "  - comparison_module: Compare resistance across domains"
-    )
-  )
-  
-  # Display appropriate help
   if (is.null(topic)) {
-    cat(paste(help_topics$general, collapse = "\n"))
-  } else if (topic %in% names(help_topics)) {
-    cat(paste(help_topics[[topic]], collapse = "\n"))
+    cat("METEOR: Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms\n\n")
+    cat("Main function categories:\n")
+    cat("  - Data import: import_amr_data(), import_local_data()\n")
+    cat("  - Data validation: validate_data(), check_data_quality()\n")
+    cat("  - Analysis: calculate_pooled_rate(), analyze_heterogeneity()\n")
+    cat("  - Visualization: create_forest_plot(), create_geo_map()\n")
+    cat("  - Reporting: generate_summary_report()\n\n")
+    cat("For more detailed help on a specific topic, use meteor_help(\"topic\")\n")
+    cat("or use the standard R help system: ?function_name\n")
   } else {
-    stop("Unknown help topic: ", topic, ". Available topics: general, ", 
-         paste(setdiff(names(help_topics), "general"), collapse = ", "))
+    if (topic %in% c("import", "data", "import_data")) {
+      cat("Data Import Functions:\n\n")
+      cat("import_amr_data() - Import AMR data from various file formats\n")
+      cat("import_local_data() - Import local research data\n")
+      cat("connect_to_database() - Connect to external AMR databases\n\n")
+      cat("For detailed function help, use: ?function_name\n")
+    } else if (topic %in% c("validate", "validation", "data_validation")) {
+      cat("Data Validation Functions:\n\n")
+      cat("validate_data() - Validate the structure and content of AMR data\n")
+      cat("check_data_quality() - Check for data quality issues\n")
+      cat("standardize_amr_data() - Standardize data fields to METEOR format\n\n")
+      cat("For detailed function help, use: ?function_name\n")
+    } else if (topic %in% c("analysis", "meta", "meta_analysis")) {
+      cat("Meta-Analysis Functions:\n\n")
+      cat("calculate_pooled_rate() - Calculate pooled resistance rates\n")
+      cat("analyze_heterogeneity() - Analyze heterogeneity among studies\n")
+      cat("perform_subgroup_analysis() - Perform subgroup meta-analysis\n\n")
+      cat("For detailed function help, use: ?function_name\n")
+    } else if (topic %in% c("visualization", "plots", "figures")) {
+      cat("Visualization Functions:\n\n")
+      cat("create_forest_plot() - Create forest plots from meta-analysis results\n")
+      cat("create_geo_map() - Create geographic maps of resistance data\n")
+      cat("create_resistance_heatmap() - Create heatmaps of resistance patterns\n\n")
+      cat("For detailed function help, use: ?function_name\n")
+    } else if (topic %in% c("report", "reporting")) {
+      cat("Reporting Functions:\n\n")
+      cat("generate_summary_report() - Generate a comprehensive summary report\n")
+      cat("generate_region_report() - Generate region-specific reports\n")
+      cat("generate_pathogen_report() - Generate pathogen-specific reports\n\n")
+      cat("For detailed function help, use: ?function_name\n")
+    } else {
+      # Try to find the function and show its help
+      if (exists(topic, mode = "function")) {
+        utils::help(topic, package = "meteor")
+      } else {
+        warning("Topic '", topic, "' not found in METEOR package.")
+        cat("Available topics: import, validation, analysis, visualization, reporting\n")
+      }
+    }
   }
   
-  invisible(NULL)
+  return(invisible(NULL))
 }
 
-#' Launch the meteor Shiny application
+#' Check required package dependencies
 #'
-#' @param data Optional data to pre-load into the application
-#' @param ... Additional parameters passed to shiny::runApp
-#' @return Invisibly returns the return value from shiny::runApp
+#' @param quietly Logical; if TRUE, suppress messages
+#'
+#' @return Logical indicating whether all dependencies are available
 #' @export
+#'
+#' @examples
+#' check_dependencies()
+check_dependencies <- function(quietly = FALSE) {
+  # Core dependencies
+  core_packages <- c("dplyr", "tidyr", "ggplot2", "meta", "metafor", "shiny")
+  
+  # Optional dependencies for advanced features
+  optional_packages <- c("leaflet", "DT", "plotly", "shinydashboard", "sf", "countrycode")
+  
+  # Check core packages
+  missing_core <- core_packages[!sapply(core_packages, requireNamespace, quietly = TRUE)]
+  
+  # Check optional packages
+  missing_optional <- optional_packages[!sapply(optional_packages, requireNamespace, quietly = TRUE)]
+  
+  # Report status
+  if (!quietly) {
+    if (length(missing_core) == 0) {
+      message("All required dependencies are installed.")
+    } else {
+      warning("Missing required dependencies: ", paste(missing_core, collapse = ", "), 
+              "\nPlease install these packages with: install.packages(c('", 
+              paste(missing_core, collapse = "', '"), "'))")
+    }
+    
+    if (length(missing_optional) > 0) {
+      message("Optional dependencies not installed: ", paste(missing_optional, collapse = ", "), 
+              "\nSome advanced features may not be available.")
+    }
+  }
+  
+  return(length(missing_core) == 0)
+}
+
+#' Launch the main METEOR Shiny application
+#'
+#' @param ... Additional parameters to pass to shiny::runApp()
+#'
+#' @return Shiny application object
+#' @export
+#'
 #' @examples
 #' \dontrun{
 #' launch_meteor()
 #' }
-launch_meteor <- function(data = NULL, ...) {
+launch_meteor <- function(...) {
   # Check if shiny is installed
-  if (!check_dependencies("shiny", quietly = TRUE)) {
-    stop("The shiny package is required to launch the application.")
+  if (!requireNamespace("shiny", quietly = TRUE)) {
+    stop("Package 'shiny' is required to run the METEOR application. Please install it.")
   }
   
-  # Set data in options if provided
-  if (!is.null(data)) {
-    set_meteor_options(shiny_data = data)
+  # Get the path to the main app
+  app_dir <- system.file("shiny-apps", "meteor-app", package = "meteor")
+  
+  if (app_dir == "") {
+    stop("Could not find Shiny application. Please reinstall 'meteor' package.")
   }
   
-  # Get the path to the app
-  app_path <- system.file("shiny-apps/meteor", package = "meteor")
-  
-  if (app_path == "") {
-    stop("Could not find the Shiny application. Try reinstalling the package.")
-  }
-  
-  # Launch the app
-  return(invisible(shiny::runApp(app_path, ...)))
+  # Run the app
+  shiny::runApp(app_dir, ...)
 } 

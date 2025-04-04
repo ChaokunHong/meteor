@@ -2,37 +2,50 @@ Package: meteor
 Title: Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms
 Version: 0.1.0
 Authors@R: 
-    person("Chaokun", "Hong", , "chaokun.hong@gmail.com", role = c("aut", "cre"))
-Description: An R package for meta-analysis of antimicrobial resistance outcomes 
-    across different realms (human, animal, and environment). It provides tools
-    for data import, validation, analysis, visualization, and reporting of 
-    antimicrobial resistance patterns.
+    person("John", "Doe", email = "john.doe@example.com", role = c("aut", "cre"))
+Description: METEOR (Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms) 
+    is a comprehensive R package for analyzing antimicrobial resistance (AMR) data. It provides
+    tools for meta-analysis, visualization, and comparison of AMR data across human, animal,
+    and environmental domains. The package includes functions for data import, validation,
+    analysis, visualization, and reporting.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
-Imports: 
+Imports:
     shiny,
-    metafor,
     ggplot2,
     dplyr,
-    stringr,
     tidyr,
     readr,
     readxl,
-    leaflet,
-    plotly,
-    DT,
     meta,
-    htmltools,
-    rmarkdown,
-    knitr,
-    magrittr,
+    metafor,
+    DT,
+    leaflet,
+    htmlwidgets,
     shinydashboard,
-    scales
-Suggests: 
-    testthat (>= 3.0.0)
-Config/testthat/edition: 3
-Depends: 
+    stats,
+    utils,
+    grDevices,
+    methods,
+    tibble
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown,
+    ggpubr,
+    ggthemes,
+    plotly,
+    sf,
+    countrycode,
+    viridis,
+    networkD3,
+    future,
+    promises,
+    R.rsp
+Depends:
     R (>= 3.5.0)
-LazyData: true 
+LazyData: true
+Config/testthat/edition: 3
+VignetteBuilder: knitr, R.rsp

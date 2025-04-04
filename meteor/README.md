@@ -1,67 +1,92 @@
-# meteor: Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms
+# METEOR 
 
-## Overview
+## Meta-analysis Tool for Exploring antimicrobial resistance Outcomes across Realms
 
-The `meteor` package is an R toolkit for meta-analysis of antimicrobial resistance (AMR) data across human, animal, and environmental domains. It provides a comprehensive set of functions for data import, validation, analysis, visualization, and reporting of AMR patterns.
+<!-- badges: start -->
+<!-- badges: end -->
+
+METEOR is an R package designed for meta-analysis of antimicrobial resistance (AMR) data across different domains: human, animal, and environment. The package provides tools for data import, validation, analysis, visualization, and reporting.
 
 ## Features
 
-- **Data Management**: Import, validate, and standardize AMR data from various sources
-- **Meta-Analysis**: Conduct pooled analyses, heterogeneity assessments, subgroup analyses, and more
-- **Visualization**: Create forest plots, geographic maps, heatmaps, and interactive visualizations
-- **Shiny Applications**: Interactive dashboards for data exploration and analysis
-- **Prediction**: Forecast AMR trends and simulate intervention impacts
-- **Reporting**: Generate customized reports for different audiences
+- Import AMR data from various file formats (CSV, Excel, RData)
+- Validate and standardize data for meta-analysis
+- Perform meta-analysis with various methods and options
+- Create static and interactive visualizations
+- Analyze heterogeneity and publication bias
+- Compare data across different domains (One Health approach)
+- Interactive exploration via a Shiny application
 
 ## Installation
 
+You can install the development version of meteor from GitHub with:
+
 ```r
-# Install from GitHub
-# devtools::install_github("username/meteor")
+# install.packages("devtools")
+devtools::install_github("username/meteor")
 ```
 
-## Usage
+## Example
+
+Basic usage example:
 
 ```r
 library(meteor)
 
-# Launch the Shiny application
-launch_meteor()
+# Import data
+amr_data <- import_amr_data("path/to/data.csv")
 
-# Or use specific functions
-data <- import_amr_data("your_data.csv")
-validated_data <- validate_data(data)
-results <- calculate_pooled_rate(validated_data)
-plot <- create_forest_plot(results)
+# Validate and standardize data
+validated_data <- validate_data(amr_data, domain = "human")
+std_data <- standardize_amr_data(validated_data, domain = "human")
+
+# Perform meta-analysis
+meta_results <- calculate_pooled_rate(
+  std_data,
+  by = c("pathogen", "antibiotic"),
+  method = "random"
+)
+
+# Create forest plot
+create_forest_plot(meta_results)
 ```
 
-## Data
+## Shiny Application
 
-The package includes curated AMR data from:
+METEOR includes an interactive Shiny application for easier data analysis:
 
-- Human clinical studies
-- Animal studies (forthcoming)
-- Environmental studies (forthcoming)
+```r
+# Launch the METEOR Shiny app
+launch_meteor()
+```
 
-Users can also upload their own data for comparison with existing meta-analyses.
+## Available Datasets
+
+The package includes sample datasets:
+
+```r
+# Load human AMR data
+data(human_data)
+data(standardized_human_data)
+```
 
 ## Documentation
 
-See the vignettes and help pages for detailed documentation:
+For more detailed information, see the package vignettes:
 
 ```r
 browseVignettes("meteor")
-help(package = "meteor")
 ```
+
+## Contributing
+
+Contributions to METEOR are welcome! Please see CONTRIBUTING.md for guidelines.
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Citation
+## Acknowledgments
 
-[Citation information]
-
-## Contributors
-
-[List of contributors] 
+- World Health Organization (WHO) for guidance on AMR monitoring
+- R meta-analysis community and package developers 

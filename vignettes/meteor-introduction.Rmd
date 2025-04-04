@@ -1,0 +1,24 @@
+---
+title: "Introduction to METEOR"
+author: "Chaokun Hong"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to METEOR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+## Installation
+
+You can install the METEOR package from GitHub:
+
+```{r, eval=FALSE}
+# Install devtools if not already installed
+if (!requireNamespace("devtools", quietly = TRUE)) {
+  install.packages("devtools")
+}
+
+# Install meteor from GitHub
+devtools::install_github("ChaokunHong/meteor")
+``` 
