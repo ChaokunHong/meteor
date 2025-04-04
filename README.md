@@ -27,7 +27,7 @@ You can install the development version of meteor from GitHub:
 
 ```r
 # Install from GitHub
-devtools::install_github("ChaokunHong/meteor")
+devtools::install_github("ChaokunHong/meteor", subdir = "meteor")
 ```
 
 ## Usage
