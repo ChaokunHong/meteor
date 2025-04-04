@@ -17,6 +17,7 @@ Imports:
     ggplot2,
     meta,
     shiny,
+    shinydashboard,
     stats,
     utils
 Suggests:
